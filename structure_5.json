@@ -1,0 +1,40 @@
+{
+    "websites": {
+        "https://arcticportal.org": {
+            "name" : "The Arctic Portal",
+            "rss" : "https://arcticportal.org/newsrss",
+            "news_css_class": "item-page news",
+            "main_tags" : ["p", "h2", "h3", "h4", "ul"],
+            "internal_tags": ["a", "span", "em", "strong", "li"]
+        },
+        "https://www.thearcticinstitute.org": {
+            "name" : "The Arctic Institute",
+            "rss" : "https://www.thearcticinstitute.org/rss/",
+            "news_css_class": "the-article",
+            "main_tags" : ["p", "h2", "h3"],
+            "internal_tags": ["a", "em", "strong"]
+        },
+        "https://www.arctictoday.com": {
+            "name" : "The Arctic Today",
+            "rss" : "https://www.arctictoday.com/rss/",
+            "news_css_class": "post-content",
+            "main_tags" : ["p", "h2", "h3", "ul"],
+            "internal_tags": ["a", "em", "strong", "li", "span"],
+            "additional_properties" : ["skip-empty-tags"] 
+        },
+        "https://www.uarctic.org": {
+            "name" : "The Uarctic",
+            "rss" : "https://www.uarctic.org/rssfeeds/feed/11577",
+            "news_css_class": "article",  
+            "main_tags" : ["p", "h1", "ul"],
+            "internal_tags": ["a", "em", "strong", "li"]
+        },
+        "https://akerarctic.fi/en/news/": {
+            "name" : "The Akerarctic",
+            "rss" : "https://akerarctic.fi/en/news/feed/",
+            "news_css_class": "mb-3",  
+            "main_tags" : ["p"],
+            "internal_tags": ["a", "em", "strong", "span", "b"]
+        }
+    }
+}
