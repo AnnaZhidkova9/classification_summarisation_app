@@ -5,16 +5,19 @@ The functionality of the system is arranged as follows: when the user launches t
 
 The application interface.
 Figure 1 shows the application interface, which is the main window that serves as the basis for the entire user interface.
+
  ![interface](https://github.com/AnnaZhidkova9/classification_summarisation_app/assets/86468434/8527217d-51e6-41bb-a84a-1b73a152b298)
 
  Figure 1 – Application interface
  
 At the top of the interface there are interactive elements available to the user for interaction. One of these elements is a substring input field designed to search for news by name. This field provides a convenient way for the user to enter keywords or phrases that can be used to filter news. The next element is the button that is clicked to perform the search. It is used to activate the search process, initiating the processing of the substring entered by the user and displaying the search results. An example of how the search bar works is shown in Figure 2.
+
  ![search](https://github.com/AnnaZhidkova9/classification_summarisation_app/assets/86468434/f9910530-6e98-4957-bb59-d3d532d1785f)
 
  Figure 2 – An example of how the search bar works
  
 Next, there are two drop-down lists: one with the URLs of the sites and the other with the topics (Figure 3). These lists allow the user to easily select the news source and the topic on which he wants to search for information. There is also a button next to the drop-down list of topics to cancel the application of the selected topic, which gives the user the opportunity to quickly reset the selection and return to the general list of news. 
+ 
  ![sites_themes](https://github.com/AnnaZhidkova9/classification_summarisation_app/assets/86468434/5c40056e-84a5-48df-84e2-ae1766a52bca)
 
  Figure 3 – Selection of the site and the subject
