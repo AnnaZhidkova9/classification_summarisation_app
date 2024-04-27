@@ -6,13 +6,13 @@ The functionality of the system is arranged as follows: when the user launches t
 The application interface.
 Figure 1 shows the application interface, which is the main window that serves as the basis for the entire user interface.
 
- ![interface](https://github.com/AnnaZhidkova9/classification_summarisation_app/assets/86468434/8527217d-51e6-41bb-a84a-1b73a152b298)
+ ![interface](https://github.com/AnnaZhidkova9/classification_summarisation_app/assets/86468434/4974e26f-6f2d-4f96-a959-15f5b1496369)
 
  Figure 1 – Application interface
  
 At the top of the interface there are interactive elements available to the user for interaction. One of these elements is a substring input field designed to search for news by name. This field provides a convenient way for the user to enter keywords or phrases that can be used to filter news. The next element is the button that is clicked to perform the search. It is used to activate the search process, initiating the processing of the substring entered by the user and displaying the search results. An example of how the search bar works is shown in Figure 2.
-
- ![search](https://github.com/AnnaZhidkova9/classification_summarisation_app/assets/86468434/f9910530-6e98-4957-bb59-d3d532d1785f)
+ 
+ ![search](https://github.com/AnnaZhidkova9/classification_summarisation_app/assets/86468434/3393787a-ccd9-480f-90f1-ba819c4b5e31)
 
  Figure 2 – An example of how the search bar works
  
