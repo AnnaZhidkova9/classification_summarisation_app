@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import pandas as pd
 import json
 import sqlite3
@@ -13,7 +13,7 @@ import feedparser
 import requests
 from bs4 import BeautifulSoup as bs
 from ttkthemes import ThemedStyle
-from tkinter import ttk, messagebox
+from transformers import pipeline
 
 """Функция для получения данных с базы данных по выбранному журналу(сайту)"""
 def get_data_databese(journal_name):
@@ -203,7 +203,7 @@ def update_table(df):
     # Добавление строк в таблицу
     for index, row in df.iterrows():
         name_state = wrap(row['Название статьи'], 37)
-        summari = wrap(row['Суммаризация'],  105)
+        summari = wrap(row['Суммаризация'],  135)
         topic = wrap(row['Тема'],  30)
         tree.insert('', 'end', values=(name_state, row['Дата публикации'], row['Ссылка на статью'], topic, summari), tags=('link',))   
 
@@ -227,6 +227,8 @@ def on_topic_selected(event):
     topic_name = topic_var.get()
     data = get_data_databese_topic(topic_name)
     update_table(data)
+    
+
     
 """Функция сбрасывает настройки с выбором темы, и выводит все статьи по данному сайту"""    
 def reset_table():
@@ -279,10 +281,231 @@ def summarize_text(text, num_sentences=3, shingle_size=10):
     compressed_text = ". ".join(summary) + '.'
     return compressed_text
 
+def update_database():
+    get_news_rss()
+    classification()
+
+"""Функция получает линк на RSS ленту, возвращает распаршенную ленту с помощью feedpaeser"""
+def getArticleProperties(rss_url, property):
+    data = []
+    feed = feedparser.parse(rss_url)
+    for newsitem in feed['items']:
+        data.append(newsitem[property])
+    return data
+
+"""Функция для добавления в базу данных новых статей с rss-каналов"""
+def get_news_rss():
+    allheadlines = []
+    alldescriptions = []
+    alllinks = []
+    alldates = []
+
+    # Соединяемся с базой данных
+    conn = sqlite3.connect('Arctic.db')
+    cursor = conn.cursor()
+    # Создаем таблицу, если она еще не существует
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS articles 
+                   (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        journal TEXT,
+        site TEXT,
+        name TEXT UNIQUE,
+        publication_date TEXT UNIQUE, 
+        text TEXT
+                   )
+                   ''')
+
+    with open('structure_5.json') as f:
+        journal_structure = json.load(f)
+
+    # Прогоняем нашии URL и добавляем их в наши пустые списки
+    for journal in journal_structure["websites"]:
+        allheadlines.extend(getArticleProperties(journal_structure["websites"][journal]["rss"], 'title'))
+        alldescriptions.extend(getArticleProperties(journal_structure["websites"][journal]["rss"],'description'))
+        alllinks.extend(getArticleProperties(journal_structure["websites"][journal]["rss"], 'links'))
+        alldates.extend(getArticleProperties(journal_structure["websites"][journal]["rss"], 'published'))
+
+        k = 0
+        for url in alllinks: # проходимся по всем новостным страницам данного сайта
+            headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:55.0) Gecko/20100101 Firefox/55.0', }
+            # Отправляем GET запрос
+            response = requests.get(url[0]['href'], headers=headers) # передаем ссылки на статьи
+            # Создаем объект BeautifulSoup, чтобы парсить HTML-код
+            soup = bs(response.content, 'html.parser')
+            name_class = journal_structure["websites"][journal]["news_css_class"]
+            
+            if journal == "https://www.uarctic.org":
+                div = soup.find("article", class_= name_class)
+            else:
+                div = soup.find("div", class_= name_class)
+
+            # Находим все параграфы в статье
+            main_tags = journal_structure["websites"][journal]["main_tags"]
+            tags = div.find_all(main_tags)
+            article_text = ""
+            # Перебираем каждые главные теги <p>, h2, h3
+            for tag in tags:
+
+                # Проверка пустой ли тег если пустой то его удаляем
+                if not tag.contents or len(tag.get_text(strip=True)) == 0:
+                    tag.decompose()
+                    continue
+
+                if journal == "https://arcticportal.org":
+                    if tag.attrs != {}:
+                        try:
+                            if tag.attrs['class']:
+                                tag.decompose()
+                        except KeyError as e:
+                            pass
+
+                if journal == "https://www.uarctic.org":
+                    try:
+                        if tag.name  == 'ul' and tag.attrs['class'] == ['bc-list']:
+                            tag.decompose()
+                    except KeyError as e:
+                        pass
+
+                # Находим все вложенные теги
+                nested_tags = tag.find_all(True, recursive=False)
+                # Перебираем каждый вложенный тег
+                for nested_tag in nested_tags:
+                    # Проверяем, является ли тег 'a', 'span', 'em', 'strong', 'sup','li'
+                    internal_tags = journal_structure["websites"][journal]["internal_tags"]
+                    if nested_tag.name not in internal_tags:
+                        # Удаляем вложенный тег
+                        nested_tag.decompose()
+                article_text += tag.text.strip() + "\n"
+                
+            # Вставляем данные в таблицу
+            cursor.execute("REPLACE INTO articles (journal, site, name, publication_date, text) VALUES (?, ?, ?, ?, ?)", 
+                           (journal, url[0]['href'], allheadlines[k], alldates[k], article_text))
+           
+            k+=1
+            
+        allheadlines.clear()
+        alldescriptions.clear()
+        alllinks.clear()
+        alldates.clear()
+    # Сохраняем изменения
+    conn.commit()
+    # Закрываем соединение с базой данных
+    conn.close()
+    
+    
+def loading_models(name_models):
+    return pipeline("zero-shot-classification", model = name_models)
+
+    
+def classification():
+    classifier_1 = loading_models("MoritzLaurer/deberta-v3-large-zeroshot-v1")
+    classifier_2 = loading_models("MoritzLaurer/DeBERTa-v3-large-mnli-fever-anli-ling-wanli")
+    classifier_3 = loading_models("sileod/deberta-v3-base-tasksource-nli")
+    classifier_4 = loading_models("knowledgator/comprehend_it-base")
+    classifier_5 = loading_models("cross-encoder/nli-deberta-base")
+
+    # Создание соединения с базой данных
+    conn = sqlite3.connect('Arctic_23_8.db')
+    c = conn.cursor()
+
+    # Проверка существования колонки
+    c.execute("PRAGMA table_info(articles)")
+    columns = [column[1] for column in c.fetchall()]
+
+    # Если колонка не существует, добавляем её
+    if 'classification' not in columns:
+        c.execute('ALTER TABLE articles ADD COLUMN classification VARCHAR')
+
+    # Выполнение запроса SELECT для получения всех ссылок из таблицы articles
+    c.execute("SELECT site FROM articles")
+
+    # Получение всех строк результата запроса
+    rows = c.fetchall()
+    sites = []
+    # Вывод всех имен
+    for row in rows:
+        sites.append(row[0])
+
+    for site in sites:
+        # Проверка наличия записи в колонке классификация
+        c.execute("SELECT classification FROM articles WHERE site = ?", (site,))
+        existing_topic = c.fetchone()[0]
+
+        # Если записи нет, добавляем новую
+        if existing_topic is None:
+            
+            # Выполнение запроса SELECT для получения текста по ссылке
+            c.execute("SELECT text FROM articles WHERE site = ?", (site,))
+            # Получение результата запроса
+            text = c.fetchone()[0]
+            candidate_labels = {'Indigenous Arctic': 0,
+                                'Geopolitical Security': 0,
+                                'Maritime Routes': 0,
+                                'International Governance': 0, 
+                                'Permafrost': 0,
+                                'Collaborative research and diplomatic engagement in the Arctic': 0}
+            
+            """СЮДА ВОТКНУТЬ ФУНКЦИЮ С КЛАССИФИКАЦИЕЙ
+            на вход подается текст
+            на выходе получаем topic
+            """
+            topic = ''
+            topic_1 = classifier_1(text, list(candidate_labels.keys()), multi_label=False)
+            for key, value in candidate_labels.items():
+                if topic_1['labels'][0] == key:
+                    candidate_labels[key] +=1
+                    
+            topic_2 = classifier_2(text, list(candidate_labels.keys()), multi_label=False)
+            for key, value in candidate_labels.items():
+                if topic_2['labels'][0] == key:
+                    candidate_labels[key] +=1
+            
+            topic_3 = classifier_3(text, list(candidate_labels.keys()), multi_label=False)
+            for key, value in candidate_labels.items():
+                if topic_3['labels'][0] == key:
+                    candidate_labels[key] +=1
+            
+            topic_4 = classifier_4(text, list(candidate_labels.keys()), multi_label=False)
+            for key, value in candidate_labels.items():
+                if topic_4['labels'][0] == key:
+                    candidate_labels[key] +=1
+                    
+            topic_5 = classifier_5(text, list(candidate_labels.keys()), multi_label=False)
+            for key, value in candidate_labels.items():
+                if topic_5['labels'][0] == key:
+                    candidate_labels[key] +=1 
+                    
+            # Отсортированный список кортежей по значению
+            sorted_items = sorted(candidate_labels.items(), key=lambda x: x[1])
+            print(sorted_items)
+            # Находим пару ключ-значение с максимальным значением
+            max_item = max(candidate_labels.items(), key=lambda x: x[1])
+            print(max_item)
+            # Проверяем, что значение больше 3
+            if max_item[1] >= 3:
+                topic = max_item[0]
+                print(max_item[0]) # Выводим ключ максимального значения
+                print("\n")
+            else:
+                print("Нет больше 3\n")
+                topic = 'Other'
+               
+            c.execute("UPDATE articles SET classification = ? WHERE site = ?", (topic, site))
+        # Сохранение изменений
+        conn.commit()
+
+    # Сохранение изменений
+    conn.commit()
+    # Закрытие соединения
+    conn.close()
+
+
 root = tk.Tk()
 root.title("Классификация и суммаризация статей")
-root.minsize(1550, 400) 
-root.geometry('1450x900+230+50')
+root.minsize(1750, 400) 
+root.geometry('1750x900+230+50')
 
 # Использование темы оформления ttkthemes
 style = ThemedStyle(root)
@@ -333,6 +556,10 @@ sentence_entry.grid(row=1, column=5, padx=10, pady=10, sticky='w')
 sentences_enter_button = ttk.Button(root, text="Применить", command=summarize)
 sentences_enter_button.grid(row=1, column=6, padx=10, pady=10, sticky='w')
 
+# Создание кнопки для обновления базы данных
+sentences_enter_button = ttk.Button(root, text="Обновить дайджест новостей", command=update_database)
+sentences_enter_button.grid(row=1, column=7, padx=10, pady=10, sticky='w')
+
 # Создание метки над полем ввода
 search_label = ttk.Label(root, text="Выбор тематики:")
 search_label.grid(row=0, column=3, padx=10, pady=10, sticky='w')
@@ -380,7 +607,7 @@ tree.heading('Суммаризация', text='Реферат')
 
 # Создание Scrollbar
 scrollbar = ttk.Scrollbar(root, orient="vertical", command=tree.yview)
-scrollbar.grid(row=3, column=7, sticky='nsw', padx=10, pady=10)
+scrollbar.grid(row=3, column=8, sticky='nsw', padx=10, pady=10)
 # Настройка таблицы для использования Scrollbar
 tree.configure(yscrollcommand=scrollbar.set)
 
@@ -388,7 +615,7 @@ tree.configure(yscrollcommand=scrollbar.set)
 tree.tag_bind('link', '<Button-1>', open_link)
 
 # Размещение таблицы в окне
-tree.grid(row=3, column=0, padx=10, pady=10, columnspan=7, sticky='nsew')
+tree.grid(row=3, column=0, padx=10, pady=10, columnspan=8, sticky='nsew')
 
 # Заполнение таблицы данными
 update_table(data)
